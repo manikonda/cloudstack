@@ -67,7 +67,7 @@ function packaging() {
     RPMDIR=$PWD/../dist/rpmbuild
     PACK_PROJECT=cloudstack
 
-    # Always define these macros; some rpmbuild/rpm versions treat empty-body macros as fatal.
+    # Always define these macros for rpmbuild; some rpm versions treat empty-body macros as fatal.
     OSSNOSS="$1"
     if [ -z "$OSSNOSS" ] ; then
         OSSNOSS="oss"
@@ -94,11 +94,60 @@ function packaging() {
         fi
     fi
 
-    VERSION=$(cd $PWD/../; $MVN org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep --color=none '^[0-9]\.' | tail -n 1)
+    PROJECT_ROOT="$PWD/../"
+    VERSION=""
+
+    # Try Maven first (best source if branding/timestamp mutates versions), but CI may block downloads.
+    VERSION_FROM_MVN=$(cd "$PROJECT_ROOT" && "$MVN" -q -DforceStdout help:evaluate -Dexpression=project.version 2>/dev/null | tail -n 1)
+    if echo "$VERSION_FROM_MVN" | grep -qE '^[0-9]'; then
+        VERSION="$VERSION_FROM_MVN"
+    else
+        # Fall back to pom.xml parsing (no network required).
+        POM_PATH="${PROJECT_ROOT%/}/pom.xml"
+        if [ -f "$POM_PATH" ]; then
+            VERSION_FROM_POM=$(python3 - "$POM_PATH" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+pom_path = sys.argv[1]
+tree = ET.parse(pom_path)
+root = tree.getroot()
+
+ns = {}
+if root.tag.startswith('{'):
+    ns = {'m': root.tag.split('}')[0].strip('{')}
+
+def find_text(path_no_ns, path_ns):
+    el = root.find(path_ns, ns) if ns else root.find(path_no_ns)
+    if el is not None and el.text:
+        return el.text.strip()
+    return None
+
+version = (
+    find_text('version', 'm:version') or
+    find_text('parent/version', 'm:parent/m:version')
+)
+
+if version:
+    print(version)
+PY
+)
+            if echo "$VERSION_FROM_POM" | grep -qE '^[0-9]'; then
+                VERSION="$VERSION_FROM_POM"
+            fi
+        fi
+    fi
+
     REALVER=$(echo "$VERSION" | cut -d '-' -f 1)
     if [ -z "$REALVER" ] ; then
-        echo "Error: Unable to determine project version from Maven output; refusing to run rpmbuild with an empty %_ver macro."
-        echo "Maven-reported version line: '$VERSION'"
+        echo "Error: Unable to determine project version; refusing to run rpmbuild with an empty %_ver macro."
+        echo "- Maven eval output: '${VERSION_FROM_MVN}'"
+        echo "- pom.xml path: '${POM_PATH:-${PROJECT_ROOT%/}/pom.xml}'"
+        if [ -f "${POM_PATH:-}" ]; then
+            echo "- pom.xml first <version>: $(grep -nE '<version>' "${POM_PATH}" | head -n 1)"
+        else
+            echo "- pom.xml not found"
+        fi
         exit 2
     fi
 
@@ -154,7 +203,7 @@ function packaging() {
         fi
     fi
 
-        # Default to %{nil} so the spec can test it safely without creating an empty-body macro.
+        # Default to %{nil} (expands to empty) without creating an empty-body macro.
         TEMPVAL="%{nil}"
     if [ "$TEMPLATES" != "" ]; then
       if [[ ",$TEMPLATES," = *",all,"* ]]; then
