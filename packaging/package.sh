@@ -53,7 +53,7 @@ USAGE
     exit 0
 }
 
-PWD=$(cd $(dirname "$0") && pwd -P)
+PWD=$(dirname $(readlink -f "$0"))
 NOW="$(date +%s)"
 
 # packaging
