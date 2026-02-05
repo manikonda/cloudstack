@@ -53,7 +53,7 @@ USAGE
     exit 0
 }
 
-PWD=$(dirname $(readlink -f "$0"))
+PWD=$(cd $(dirname "$0") && pwd -P)
 NOW="$(date +%s)"
 
 # packaging
@@ -67,11 +67,15 @@ function packaging() {
     RPMDIR=$PWD/../dist/rpmbuild
     PACK_PROJECT=cloudstack
 
-    if [ -n "$1" ] ; then
-        DEFOSSNOSS="-D_ossnoss $1"
+    # Always define these macros; some rpmbuild/rpm versions treat empty-body macros as fatal.
+    OSSNOSS="$1"
+    if [ -z "$OSSNOSS" ] ; then
+        OSSNOSS="oss"
     fi
-    if [ -n "$2" ] ; then
-        DEFSIM="-D_sim $2"
+
+    SIMVAL="$2"
+    if [ -z "$SIMVAL" ] ; then
+        SIMVAL="false"
     fi
     if [ "$6" == "true" ]; then
         INDICATOR="$NOW"
@@ -90,8 +94,13 @@ function packaging() {
         fi
     fi
 
-    VERSION=$(cd $PWD/../; $MVN org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep --color=none '^[0-9]\.')
+    VERSION=$(cd $PWD/../; $MVN org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep --color=none '^[0-9]\.' | tail -n 1)
     REALVER=$(echo "$VERSION" | cut -d '-' -f 1)
+    if [ -z "$REALVER" ] ; then
+        echo "Error: Unable to determine project version from Maven output; refusing to run rpmbuild with an empty %_ver macro."
+        echo "Maven-reported version line: '$VERSION'"
+        exit 2
+    fi
 
     if [ -n "$5" ]; then
         BRAND="${5}."
@@ -108,15 +117,15 @@ function packaging() {
 
     if echo "$VERSION" | grep -q SNAPSHOT ; then
         if [ -n "$4" ] ; then
-            DEFREL="-D_rel ${BRAND}${INDICATOR}.$4"
+            RELVAL="${BRAND}${INDICATOR}.$4"
         else
-            DEFREL="-D_rel ${BRAND}${INDICATOR}"
+            RELVAL="${BRAND}${INDICATOR}"
         fi
     else
         if [ -n "$4" ] ; then
-            DEFREL="-D_rel ${BRAND}$4"
+            RELVAL="${BRAND}$4"
         else
-            DEFREL="-D_rel ${BRAND}1"
+            RELVAL="${BRAND}1"
         fi
     fi
 
@@ -145,18 +154,16 @@ function packaging() {
         fi
     fi
 
-    DEFTEMP="-D_temp ''"
+        # Default to %{nil} so the spec can test it safely without creating an empty-body macro.
+        TEMPVAL="%{nil}"
     if [ "$TEMPLATES" != "" ]; then
       if [[ ",$TEMPLATES," = *",all,"* ]]; then
-        DEFTEMP="-D_temp '-Dsystemvm-kvm -Dsystemvm-xen -Dsystemvm-vmware'"
+                TEMPVAL="-Dsystemvm-kvm -Dsystemvm-xen -Dsystemvm-vmware"
       else
         TEMP=-Dsystemvm-"${TEMPLATES//,/" -Dsystemvm-"}"
-        DEFTEMP="-D_temp ${TEMP}"
+                TEMPVAL="${TEMP}"
       fi
     fi
-
-    DEFFULLVER="-D_fullver $VERSION"
-    DEFVER="-D_ver $REALVER"
 
     echo "Preparing to package Apache CloudStack $VERSION"
 
@@ -173,7 +180,15 @@ function packaging() {
     echo ". executing rpmbuild"
     cp "$PWD/$DISTRO/cloud.spec" "$RPMDIR/SPECS"
 
-    (cd "$RPMDIR"; rpmbuild --define "_topdir ${RPMDIR}" "${DEFVER}" "${DEFFULLVER}" "${DEFREL}" ${DEFPRE+"$DEFPRE"} ${DEFOSSNOSS+"$DEFOSSNOSS"} ${DEFSIM+"$DEFSIM"} ${DEFTEMP+"$DEFTEMP"} -bb SPECS/cloud.spec)
+    (cd "$RPMDIR"; rpmbuild \
+        --define "_topdir ${RPMDIR}" \
+        --define "_ver ${REALVER}" \
+        --define "_fullver ${VERSION}" \
+        --define "_rel ${RELVAL}" \
+        --define "_ossnoss ${OSSNOSS}" \
+        --define "_sim ${SIMVAL}" \
+        --define "_temp ${TEMPVAL}" \
+        -bb SPECS/cloud.spec)
     if [ $? -ne 0 ]; then
         if [ "$USE_TIMESTAMP" == "true" ]; then
             (cd $PWD/../; git reset --hard)
