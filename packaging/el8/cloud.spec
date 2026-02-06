@@ -209,8 +209,13 @@ if [ "%{?_temp}" != "" ]; then
     FLAGS="$FLAGS $(rpm --eval "%{?_temp}")"
 fi
 
-mvn -Psystemvm,developer $FLAGS clean package
+whoami
+id
+pwd
+df -h
 cd ui && npm install && npm run build && cd ..
+mvn -Psystemvm,developer $FLAGS clean package
+#cd ui && npm install && npm run build && cd ..
 
 %install
 [ ${RPM_BUILD_ROOT} != "/" ] && rm -rf ${RPM_BUILD_ROOT}
