@@ -217,7 +217,7 @@ echo $PATH
 env | sort
 cat ~builder/.bashrc
 echo
-. ~builder/.bashrc
+HOME=~builder. ~builder/.bashrc
 echo "Sourced"
 cd ui && npm install && npm run build && cd ..
 mvn -Psystemvm,developer $FLAGS clean package
