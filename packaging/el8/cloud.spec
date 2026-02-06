@@ -215,6 +215,8 @@ pwd
 df -h
 echo $PATH
 env | sort
+ls -ld ~builder
+ls -l ~builder/.bashrc
 cat ~builder/.bashrc
 echo "Sourcing"
 HOME=~builder ~builder/.bashrc
