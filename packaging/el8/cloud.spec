@@ -213,6 +213,8 @@ whoami
 id
 pwd
 df -h
+echo $PATH
+find $(pwd) -type f
 cd ui && npm install && npm run build && cd ..
 mvn -Psystemvm,developer $FLAGS clean package
 #cd ui && npm install && npm run build && cd ..
