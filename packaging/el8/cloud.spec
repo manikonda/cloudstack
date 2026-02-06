@@ -214,8 +214,11 @@ id
 pwd
 df -h
 echo $PATH
+env | sort
 cat ~builder/.bashrc
+echo
 . ~builder/.bashrc
+echo "Sourced"
 cd ui && npm install && npm run build && cd ..
 mvn -Psystemvm,developer $FLAGS clean package
 #cd ui && npm install && npm run build && cd ..
