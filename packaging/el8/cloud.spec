@@ -216,8 +216,8 @@ df -h
 echo $PATH
 env | sort
 cat ~builder/.bashrc
-echo
-HOME=~builder. ~builder/.bashrc
+echo "Sourcing"
+HOME=~builder ~builder/.bashrc
 echo "Sourced"
 cd ui && npm install && npm run build && cd ..
 mvn -Psystemvm,developer $FLAGS clean package
