@@ -209,18 +209,7 @@ if [ "%{?_temp}" != "" ]; then
     FLAGS="$FLAGS $(rpm --eval "%{?_temp}")"
 fi
 
-whoami
-id
-pwd
-df -h
-echo $PATH
-env | sort
-ls -ld ~builder
-ls -l ~builder/.bashrc
-cat ~builder/.bashrc
-echo "Sourcing"
-HOME=~builder ~builder/.bashrc
-echo "Sourced"
+source ~/.bashrc
 cd ui && npm install && npm run build && cd ..
 mvn -Psystemvm,developer $FLAGS clean package
 #cd ui && npm install && npm run build && cd ..
