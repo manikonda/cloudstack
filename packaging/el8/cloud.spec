@@ -215,7 +215,7 @@ pwd
 df -h
 echo $PATH
 cat ~builder/.bashrc
-find ~builder/.nvm
+find ~/.local/bin
 . ~builder/.bashrc
 cd ui && npm install && npm run build && cd ..
 mvn -Psystemvm,developer $FLAGS clean package
